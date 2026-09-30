@@ -27,15 +27,23 @@ The goal was to configure a Conditional Access policy that blocks access from a 
 - Proton VPN
 - Microsoft 365
 
-## Investigation Workflow
+---
 
-### 1. Geographic Location Simulation
+# Investigation Workflow
 
-A VPN connection was used in the lab to simulate authentication originating from Mexico.
+## 1. Geographic Location Simulation
+
+A VPN connection was used in the lab to simulate authentication originating from **Mexico**.
 
 This allowed the geographic Conditional Access rule to be tested without requiring a physical connection from that location.
 
-### 2. Conditional Access Configuration
+![VPN Mexico Test](01-vpn-mexico-test.png.png)
+
+**Evidence:** The VPN connection placed the test system in Mexico. Sensitive IP information has been sanitized.
+
+---
+
+## 2. Conditional Access Configuration
 
 A Named Location was created for the selected country.
 
@@ -43,43 +51,61 @@ A Conditional Access policy named:
 
 `Block-Selected-Countries-Lab`
 
-was configured to evaluate the selected user and Microsoft cloud resources.
+was configured for the selected test user and Microsoft cloud resources.
 
-The grant control was configured to:
+The Grant control was configured to:
 
 **Block access**
 
-The policy was initially placed in **Report-only** mode so its expected behavior could be evaluated without immediately enforcing the restriction.
+The policy was first evaluated in **Report-only** mode before being changed to **On** for enforcement.
 
-### 3. Policy Enforcement
+---
 
-After validating the policy configuration, the Conditional Access policy was changed from **Report-only** to **On**.
+## 3. Access Block Validation
 
-A new authentication attempt was then performed while connected through the VPN.
+After the policy was enabled, another authentication attempt was performed while connected through the Mexico VPN location.
 
-Microsoft Entra successfully prevented access to the protected resource.
+Microsoft Entra prevented access to the protected Microsoft 365 resource.
 
-### 4. Sign-In Log Validation
+![Conditional Access Block](02-access-blocked-png.png)
 
-The blocked authentication was reviewed in Microsoft Entra sign-in logs.
+**Result:** The credentials were accepted for authentication, but access to the resource was denied because the request did not satisfy the Conditional Access requirements.
 
-The event showed:
+---
 
-- Location: Mexico
-- Application: One Outlook Web
-- Conditional Access result: Failure
-- Error code: `53003`
-- Access control: Block
+## 4. Entra Sign-In Log Investigation
 
-Error `53003` confirmed that access was blocked because the authentication request did not satisfy the Conditional Access policy.
+The blocked authentication was then investigated in Microsoft Entra sign-in logs.
 
-## Defender XDR Advanced Hunting
+The Conditional Access details identified:
 
-The identity activity was then investigated using Microsoft Defender XDR Advanced Hunting.
+- **Policy:** `Block-Selected-Countries-Lab`
+- **Grant control:** Block
+- **Result:** Failure
 
-The `EntraIdSignInEvents` table was queried to locate the corresponding authentication activity.
+![Conditional Access Failure](03-conditional-access-failure.png.png)
 
-Example KQL:
+This confirmed that the custom Conditional Access policy was responsible for denying access.
+
+Additional sign-in investigation identified:
+
+- **Location:** Mexico
+- **Application:** One Outlook Web
+- **Conditional Access result:** Failure
+- **Error code:** `53003`
+- **Access control:** Block
+
+Error `53003` indicated that access was blocked by a Conditional Access policy.
+
+---
+
+# Defender XDR Advanced Hunting
+
+The identity activity was then investigated using **Microsoft Defender XDR Advanced Hunting**.
+
+The `EntraIdSignInEvents` table was queried to identify the blocked authentication events.
+
+## KQL Query
 
 ```kusto
 EntraIdSignInEvents
@@ -97,48 +123,63 @@ EntraIdSignInEvents
 | order by Timestamp desc
 ```
 
-### Hunting Results
+## Hunting Results
 
-The Advanced Hunting query returned the blocked authentication events associated with the Conditional Access test.
+![Defender XDR Advanced Hunting](04-defender-xdr-hunting.png.png)
 
-The results confirmed:
+The query identified the corresponding identity events and showed:
 
-- Authentication activity originated from the simulated Mexico location
-- The affected application was One Outlook Web
-- The events contained error code `53003`
-- The events could be correlated using the `CorrelationId`
-- The identity activity was visible in the `EntraIdSignInEvents` table
+- **Application:** One Outlook Web
+- **Country:** MX
+- **City:** Mexico City
+- **ErrorCode:** `53003`
+- Corresponding identity activity in `EntraIdSignInEvents`
+- Events available for correlation through `CorrelationId`
 
-This demonstrated that the Conditional Access enforcement observed in Microsoft Entra could also be investigated through Microsoft Defender XDR Advanced Hunting.
+Sensitive account and IP information shown in the hunting results was sanitized before publication.
 
-## Key Findings
+---
 
-The lab demonstrated that successful authentication does not automatically guarantee access to a cloud resource. Microsoft Entra Conditional Access can evaluate additional signals, such as geographic location, before authorizing access.
+# Investigation Flow
 
-The workflow demonstrated how a SOC analyst can move from:
+**VPN Mexico Simulation → Conditional Access Evaluation → Access Blocked → Entra Sign-In Validation → Defender XDR Advanced Hunting**
 
-**Policy Configuration → Authentication Test → Access Block → Sign-In Log Validation → Defender XDR Hunting**
+This lab demonstrated how an identity-based security control can be configured, tested, validated, and investigated across Microsoft Entra ID and Microsoft Defender XDR.
 
-## Security Takeaways
+---
 
-- Conditional Access adds an additional access-control layer beyond credentials.
-- Report-only mode allows a policy to be evaluated before enforcement.
-- Named Locations can be used as a condition in access-control policies.
+# Key Findings
+
+Valid credentials alone do not guarantee access to a cloud resource.
+
+Microsoft Entra Conditional Access can evaluate additional signals, including geographic location, before allowing access to a protected resource.
+
+The lab demonstrated that:
+
+- Conditional Access can restrict authentication based on geographic conditions.
+- Report-only mode can be used to evaluate a policy before enforcement.
+- Named Locations can provide geographic conditions for access decisions.
 - Entra sign-in logs provide evidence explaining why access was denied.
-- Error code `53003` can indicate that access was blocked by a Conditional Access policy.
-- Defender XDR Advanced Hunting provides another way to investigate and correlate Entra identity events using KQL.
+- Error code `53003` can identify authentication blocked by Conditional Access.
+- Defender XDR Advanced Hunting can be used to investigate Entra identity events using KQL.
 
-## Result
+---
 
-**Successful security-control validation.**
+# Result
+
+## Successful Security-Control Validation
 
 The Conditional Access policy matched the simulated geographic location and prevented access to the protected Microsoft 365 resource.
 
 The blocked authentication was validated in Microsoft Entra sign-in logs and subsequently identified through Microsoft Defender XDR Advanced Hunting.
 
-## Skills Demonstrated
+---
+
+# Skills Demonstrated
 
 `Microsoft Entra ID` • `Conditional Access` • `Identity Security` • `Defender XDR` • `Advanced Hunting` • `KQL` • `Sign-In Log Analysis` • `Security Control Validation`
+
+---
 
 ## Lab Environment
 
